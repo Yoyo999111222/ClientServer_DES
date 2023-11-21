@@ -6,7 +6,7 @@ import signal
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # Bind address dan port
-server_address = ('localhost', 5555)
+server_address = ('10.44.1.2', 5555)
 server_socket.bind(server_address)
 
 # Listen for incoming connections (maksimal 5 koneksi)
@@ -19,14 +19,14 @@ def forward_message(message, sender_socket):
     for client, client_socket in clients.items():
         if client_socket != sender_socket:
             try:
-                
+
                 client_socket.send(message)
             except:
                 # Jika ada error, hapus client yang terputus
                 del clients[client]
                 print(f"Connection with {client} closed.")
                 client_socket.close()
-                
+
 def handle_client(client_socket, client_name):
     try:
         while True:
@@ -35,17 +35,28 @@ def handle_client(client_socket, client_name):
             if not data:
                 break
 
+            if data.decode('utf-8') == "Client closing":
+                print(f"Connection with {client_name} closed.")
+                del clients[client_name]
+                client_socket.close()
+                break
+
             # Broadcast pesan ke semua client
             message = f"{client_name}: {data.decode('utf-8')}"
             # print(message)
 
             # Forward pesan ke semua client
             forward_message(message.encode('utf-8'), client_socket)
-            # forward_message(data, client_socket)
-    except:
-        # Jika ada error, hapus client yang terputus
+
+    except ConnectionError:
+        # Jika koneksi terputus oleh client
         del clients[client_name]
         print(f"Connection with {client_name} closed.")
+        client_socket.close()
+
+    except Exception as e:
+        print(f"An error occurred with client {client_name}: {str(e)}")
+        del clients[client_name]
         client_socket.close()
 
 def signal_handler(sig, frame):
@@ -77,8 +88,3 @@ while True:
     # Menangani setiap koneksi dalam thread terpisah
     client_handler = threading.Thread(target=handle_client, args=(client_socket, client_name))
     client_handler.start()
-
-
-
-
-
